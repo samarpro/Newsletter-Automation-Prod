@@ -1,0 +1,33 @@
+# URL Collection for DSEC AI Newsletter
+# 
+# This file contains a curated list of article URLs to be processed for the newsletter.
+# Each URL should point to a relevant article from technology news sources.
+#
+# Format:
+#   - One URL per line
+#   - URLs should be fully qualified (include protocol)
+#   - Supported domains: wired.com, techcrunch.com, and other tech publications
+#
+# Usage:
+#   This file is typically consumed by the newsletter generation pipeline
+#   to fetch and process article content for summarization and distribution.
+#
+# Maintenance:
+#   - Remove outdated URLs periodically
+#   - Ensure URLs are accessible and not behind paywalls
+#   - Verify URLs are relevant to AI and technology topics
+urls:
+  - https://www.theguardian.com/business/2026/jan/04/battery-electric-cars-diesels-great-britain-london-ulez
+  # - https://www.wired.com/story/expired-tired-wired-data-centers/
+  # - https://www.wired.com/story/expired-tired-wired-gpt-5/
+  # - https://techcrunch.com/2026/01/01/is-the-apple-watch-se-3-a-good-deal/
+  # - https://www.techradar.com/computing/windows/almost-3-years-later-its-time-to-admit-that-microsoft-copilot-was-a-mistake
+  # - https://www.smartcompany.com.au/startupsmart/five-aussie-startups-excited-to-watch-2026/
+  # - https://www.smartcompany.com.au/technology/explainer-what-is-lemon8-surging-up-app-charts-social-media-ban/
+  # - https://www.paulgraham.com/goodwriting.html
+  # - https://www.reuters.com/world/china/nvidia-sounds-out-tsmc-new-h200-chip-order-china-demand-jumps-sources-say-2025-12-31/
+  
+
+
+
+

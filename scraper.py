@@ -1,5 +1,5 @@
-from .imports import sync_playwright, envs, BeautifulSoup as bs4, lxml
-from lxml import html
+from imports import sync_playwright,  html ,BeautifulSoup as bs4
+import traceback
 
 class Scraper:
     """A web scraper using Playwright to fetch and interact with web pages.
@@ -43,7 +43,8 @@ class Scraper:
                 return current
             
             # Count words in each child
-            child_word_counts = [(child, count_words(child)) for child in children]
+            
+            child_word_counts = [(child, count_words(child)) for child in children if isinstance(child, html.HtmlElement)]
             
             # Filter out children with very few words (likely not content)
             child_word_counts = [(child, wc) for child, wc in child_word_counts if wc > 10]
@@ -62,10 +63,10 @@ class Scraper:
             else:
                 return current
             
-            print(f"Layer: {current.tag}, children: {len(children)}, max child: {max_child.tag} ({max_words} words, {max_ratio:.2%} of parent)")
+            print(f"Layer: {current.tag}, class:{current.get('class')} children: {len(children)}, max child: {max_child.tag} ({max_words} words, {max_ratio:.2%} of parent)")
             
             # If no single child dominates (text is evenly distributed), stop
-            if max_ratio < threshold:
+            if max_ratio <=threshold:
                 print(f"Text evenly distributed, stopping at {current.tag}")
                 return current
             
@@ -74,7 +75,25 @@ class Scraper:
         
         return current
         
-    
+    def check_rss(self, url:str) -> bool:
+        """Check if the given URL points to an RSS feed by looking for common RSS tags.
+        
+        Args:
+            url: The URL to check."""
+        try:
+            self.page.goto(url, wait_until="domcontentloaded")
+            page_content = self.page.content()
+            soup = bs4(page_content, 'html.parser')
+            rss_tags = ['rss', 'feed', 'channel', 'item']
+            for tag in rss_tags:
+                if soup.find(tag):
+                    print(f"RSS feed detected at {url} due to presence of <{tag}> tag.")
+                    return True
+            return False
+        except Exception as e:
+            print(f"Error checking RSS for {url}: {e}")
+            return False
+
     def scrape(self, urls:list[str]) -> str:
         with open("output.txt", 'w') as f:
             for _, url in enumerate(urls):
@@ -92,7 +111,7 @@ class Scraper:
                     print(f"\n=== Analyzing {url} ===")
                     
                     # Use density-based content detection
-                    content_element = self.find_content_by_density(tree, threshold=0.5)
+                    content_element = self.find_content_by_density(tree, threshold=0.6)
                     extracted_text = content_element.text_content().strip()
                     
                     print(f"Chracter count from {url}: {len(extracted_text)}\n")
@@ -104,7 +123,7 @@ class Scraper:
                     
                 except Exception as e:
                     f.write(f"URL: {url}\n")
-                    f.write(f"Error navigating to {url}: {e}\n")
+                    f.write(f"Error navigating to {url}: \n {e} {traceback.format_exc()}\n")
                     print(f"Failed...", _+1)
                     continue
         return ''

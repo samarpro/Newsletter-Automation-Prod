@@ -1,0 +1,7 @@
+publishers :
+  - "https://www.theguardian.com/uk/technology"
+  - "https://www.nytimes.com/international/section/technology"
+  - "https://www.wired.com/category/business/"
+  - "https://techcrunch.com/category/startups/feed"
+  - "https://techcrunch.com/category/artificial-intelligence/feed/"
+  - "https://techcrunch.com/category/security/feed/"
