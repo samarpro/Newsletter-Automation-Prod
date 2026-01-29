@@ -1,4 +1,5 @@
-from imports import sync_playwright,  html ,BeautifulSoup as bs4
+from imports import sync_playwright,  html, BeautifulSoup as bs4, Article, json
+import re
 import traceback
 
 class Scraper:
@@ -10,6 +11,7 @@ class Scraper:
         self.browser = self.pw.chromium.launch(headless=False)
         self.page = self.browser.new_page()
         self.noise_tags = ["script", "style", "noscript", "header", "footer", "meta", "link", "aside", "svg", "img", "nav"]
+        self.blacklist_words = ["comment", "footer", "header", "nav", "sidebar", "advert", "ads", "sponsor", "related", "popup", "subscribe", "share", "widget", "breadcrumb", "cookie", "consent", "banner", "tool", "button", "form", "input", "search", "login", "signup","cta", "menu", "social", "follow", "like", "dislike", "rating", "review", "feedback", "poll", "survey", "tag", "tags", "category", "categories","newsletter", "archive", "copyright", "terms", "privacy", "policy", "disclaimer", "sitemap", "faq", "help", "support", "contact"]
         # Set a realistic user agent to avoid being blocked
         self.page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
@@ -36,6 +38,12 @@ class Scraper:
         
         while True:
             children = list(current)
+            # children is all the tags
+            # iterare through all the children
+            # and check if class name contains blacklist words
+            # if it does, count the number of words in the child
+            # subtract that from the parent's word count
+            # new parent word count = parent word count - child (blacklisted) word count
             
             # If no children, we've reached a leaf - return current
             if not children:
@@ -43,11 +51,24 @@ class Scraper:
                 return current
             
             # Count words in each child
-            
-            child_word_counts = [(child, count_words(child)) for child in children if isinstance(child, html.HtmlElement)]
-            
-            # Filter out children with very few words (likely not content)
-            child_word_counts = [(child, wc) for child, wc in child_word_counts if wc > 10]
+            pattern = r"(^|[\s_-])(" + "|".join(map(re.escape, self.blacklist_words)) + r")(?=$|[\s_-])"
+            regex = re.compile(pattern, re.IGNORECASE)
+            child_word_counts = []
+
+            for child in children:
+                if not isinstance(child, html.HtmlElement):
+                    continue
+
+                if regex.search(child.get('class', '')):
+                    current.remove(child)
+                    continue
+                # Filter out children with very few words (likely not content)
+                if (word_count:=count_words(child)) < 20:
+                    continue
+
+                child_word_counts.append((child, word_count))
+
+    
             
             if not child_word_counts:
                 print(f"No children with substantial text in {current.tag}")
@@ -76,6 +97,7 @@ class Scraper:
         return current
         
     def check_rss(self, url:str) -> bool:
+        # redundant now, may be useful later
         """Check if the given URL points to an RSS feed by looking for common RSS tags.
         
         Args:
@@ -94,39 +116,41 @@ class Scraper:
             print(f"Error checking RSS for {url}: {e}")
             return False
 
-    def scrape(self, urls:list[str]) -> str:
-        with open("output.txt", 'w') as f:
-            for _, url in enumerate(urls):
-                try:
-                    self.page.goto(url, wait_until="domcontentloaded")
-                    page_content = self.page.content()
-                    
-                    # Parse with lxml and remove noise tags from the entire tree
-                    tree = html.fromstring(page_content)
-                    for tag in self.noise_tags:
-                        noise_elements = tree.xpath(f'//{tag}')
-                        for el in noise_elements:
-                            el.getparent().remove(el)
+    def scrape(self, articles:list[Article]) -> bool:
+        output = []
+        for _, article in enumerate(articles):
+            url = article['link']
+            try:
+                self.page.goto(url, wait_until="domcontentloaded")
+                page_content = self.page.content()
                 
-                    print(f"\n=== Analyzing {url} ===")
-                    
-                    # Use density-based content detection
-                    content_element = self.find_content_by_density(tree, threshold=0.6)
-                    extracted_text = content_element.text_content().strip()
-                    
-                    print(f"Chracter count from {url}: {len(extracted_text)}\n")
-                    print("success...", _+1)
-                    f.writelines(f"URL: {url}\n")
-                    f.writelines(extracted_text)
-                    # f.writelines("\n".join(extracted_text))
-                    f.writelines("\n" + "="*50 + "\n")                
-                    
-                except Exception as e:
-                    f.write(f"URL: {url}\n")
-                    f.write(f"Error navigating to {url}: \n {e} {traceback.format_exc()}\n")
-                    print(f"Failed...", _+1)
-                    continue
-        return ''
+                # Parse with lxml and remove noise tags from the entire tree
+                tree = html.fromstring(page_content)
+                for tag in self.noise_tags:
+                    noise_elements = tree.xpath(f'//{tag}')
+                    for el in noise_elements:
+                        el.getparent().remove(el)
+            
+                print(f"\n=== Analyzing {url} ===")
+                
+                # Use density-based content detection
+                content_element = self.find_content_by_density(tree, threshold=0.6)
+                extracted_text = content_element.text_content().strip()
+                article['content'] = extracted_text
+                print(f"Chracter count from {url}: {len(extracted_text)}\n")
+                print(f"Word count from {url}: {len(extracted_text.split())}\n")
+                print("success...", _+1)              
+                
+            except Exception as e:
+
+                print(f"Error navigating to {url}: \n {e} {traceback.format_exc()}\n")
+                print(f"Failed...", _+1)
+                continue
+            
+        with open(output_file:="scraped_content.json", 'w', encoding='utf-8') as f:
+            json.dump(articles, f, ensure_ascii=False, indent=4
+                      )
+        return True
         
     def close(self) -> None:
         self.browser.close()

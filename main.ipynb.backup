@@ -1,0 +1,539 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "cab79390",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "True"
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from imports import sync_playwright,  html, BeautifulSoup as bs4, yaml, requests, feedparser\n",
+    "from scraper import Scraper\n",
+    "import json\n",
+    "from groq import Client\n",
+    "import dotenv\n",
+    "import os\n",
+    "dotenv.load_dotenv()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "59495277",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# getting URL of sites to get their RSS feed link\n",
+    "\n",
+    "def get_rss_urls(publishers:list[str]) -> list[str]:\n",
+    "    \"\"\"
+",
+    "    Given a list of publisher URLs, extract RSS links from their HTML content.\"\"\"\n",
+    "    rss_url = set()\n",
+    "    for publisher in publishers:\n",
+    "        try:\n",
+    "            response = requests.get(publisher)\n",
+    "            html_content = response.text\n",
+    "            soup = bs4(html_content, 'html.parser')\n",
+    "            head = soup.find('head')\n",
+    "            if head:\n",
+    "                rss_link = head.find('link', type='application/rss+xml')\n",
+    "                if rss_link and rss_link.has_attr('href'):\n",
+    "                    rss_url.add(rss_link['href'])\n",
+    "                    print(f\"Found RSS link for {publisher}: {rss_link['href']}\")\n",
+    "                else:\n",
+    "                    print(f\"No RSS link found in head for {publisher}\")\n",
+    "            else:\n",
+    "                print(f\"No head tag found for {publisher}\")\n",
+    "        except Exception as e:\n",
+    "            print(f\"Error processing {publisher}: {e}\")\n",
+    "            \n",
+    "    return list(rss_url)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "a7153caa",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_articles_urls(rss_urls:list[str]) -> list[dict]:\n",
+    "    \"\"\"Given a list of RSS feed URLs, fetch articles from each feed.\"\"\"\n",
+    "    articles = []\n",
+    "    for url in rss_urls:\n",
+    "        try:\n",
+    "            feed = feedparser.parse(url)\n",
+    "            print(f\"Number of entries found in {url[10]}...: {len(feed.entries)}\")\n",
+    "            for entry in feed.entries:\n",
+    "                article = {\n",
+    "                    'title': entry.title,\n",
+    "                    'link': entry.link,\n",
+    "                    'published': entry.get('published', 'N/A'),\n",
+    "                    'category': [tag.term for tag in entry.tags] if 'tags' in entry else []\n",
+    "                }\n",
+    "                articles.append(article)\n",
+    "        except Exception as e:\n",
+    "            print(f\"Error fetching articles from {url}: {e}\")\n",
+    "    return articles\n",
+    "\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "263c9224",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Found RSS link for https://www.theguardian.com/uk/technology: https://www.theguardian.com/uk/technology/rss\n",
+      "Found RSS link for https://www.nytimes.com/international/section/technology: https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/international/section/technology/rss.xml\n",
+      "Found RSS link for https://www.wired.com/category/business/: https://www.wired.com/feed/rss\n",
+      "Found RSS link for https://techcrunch.com/category/startups/: https://techcrunch.com/feed/\n",
+      "Found RSS link for https://techcrunch.com/category/artificial-intelligence/: https://techcrunch.com/feed/\n",
+      "Found RSS link for https://techcrunch.com/category/security/: https://techcrunch.com/feed/\n"
+     ]
+    }
+   ],
+   "source": [
+    "\n",
+    "try:\n",
+    "    with open(\"publishers.yaml\", 'r') as f:\n",
+    "        publishers = yaml.safe_load(f)['publishers']\n",
+    "except Exception as e:\n",
+    "    print(f\"Error loading publishers.yaml: {e}\")\n",
+    "    publishers = []\n",
+    "\n",
+    "if not publishers:\n",
+    "    print(\"No publishers found in publishers.yaml\")\n",
+    "    \n",
+    "\n",
+    "rss_urls = get_rss_urls(publishers)\n",
+    "# get_articles_urls(rss_urls)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "b82c5a7f",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Number of entries found in c...: 20\n",
+      "Total articles fetched: 20\n"
+     ]
+    }
+   ],
+   "source": [
+    "# articles = get_articles_urls(rss_urls)\n",
+    "articles = get_articles_urls(['https://techcrunch.com/category/security/feed/'])\n",
+    "print(f\"Total articles fetched: {len(articles)}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "346981b7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "with open(\"scraped_content.json\", 'r', encoding='utf-8') as f:\n",
+    "    articles_info= json.loads(f.read())\n",
+    "groq = Client(api_key=os.environ.get('GROQ_API_KEY'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "f78aa53c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "articles_info = [article for article in articles_info if len(article['content'].strip()) >20]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "8eacd63b",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "38"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "len(articles_info)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "4807e248",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "system_prompt = \"\"\"\n",
+    "You are an information extraction engine.\n",
+    "\n",
+    "Your task is to extract structured facts from a news article.\n",
+    "You must NOT summarize creatively, speculate, or add opinions.\n",
+    "You must NOT introduce any information that is not explicitly present in the content.\n",
+    "\n",
+    "If information is missing or unclear, use:\n",
+    "- empty string \"\" for strings\n",
+    "- empty array [] for arrays\n",
+    "- null for unknown values\n",
+    "\n",
+    "You must output VALID JSON only.\n",
+    "No markdown.\n",
+    "No explanations.\n",
+    "No extra text.\n",
+    "SCORING RULES:\n",
+    "You MUST provide numerical scores between 0.0 and 10.0 for all score fields. \n",
+    "- Use 0.0 only if the content is completely unrelated.\n",
+    "- Use 5.0 for moderate relevance/impact.\n",
+    "- Use 10.0 for global, historical, or life-changing significance.\n",
+    "Do NOT use null for scores; estimate based on the provided text.\n",
+    "\n",
+    "\"\"\"\n",
+    "ARTICLE_CONTENT = \"\"\n",
+    "user_prompt = '''\n",
+    "Extract factual, structured information from the following content.\n",
+    "\n",
+    "Rules:\n",
+    "- Be concise but accurate.\n",
+    "- Use neutral language.\n",
+    "- Do not rephrase beyond what is necessary for clarity.\n",
+    "- Scores must be based only on the provided content.\n",
+    "- Dates must not be inferred.\n",
+    "- If unsure, mark values as null.\n",
+    "\n",
+    "Output strictly in the following JSON schema:\n",
+    "{\n",
+    "  \"headline\": \"...\",\n",
+    "  \"summary_1_sentence\": \"...\",\n",
+    "  \"key_points\": { ... },\n",
+    "\n",
+    "  \"relevance\": 0.0, // Scale 0-10: How focused is the article on the main subject?\n",
+    "  \n",
+    "  \"impact_score\": 0.0, // Scale 0-10: How many people or industries does this change?\n",
+    "  \n",
+    "  \"student_relevance\": 0.0, // Scale 0-10: How much does this affect academic or career paths?\n",
+    "  \n",
+    "  \"long_term_importance\": 0.0, // Scale 0-10: Will this matter in 5 years?\n",
+    "  \n",
+    "  \"deduplication_hint\": \"Unique identifier (e.g., 'Company_Event_Date')\"\n",
+    "}\n",
+    "\n",
+    "CONTENT:\n",
+    "<<<\n",
+    "{{ARTICLE_CONTENT}}",
+    "\n",
+    " >>>\n",
+    "'''"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6ea1604f",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "{\n",
+      "  \"headline\": \"Second Trump administration described as a \\\"clicktatorship\\\" driven by right‑wing social media\",\n",
+      "  \"summary_1_sentence\": \"Professor Don Moynihan argues that the second Trump term operates as a \\\"clicktatorship\\\", where policy decisions are shaped primarily by online right‑wing platforms like X and the influence of figures such as Elon Musk.\",\n",
+      "  \"key_points\": {\n",
+      "    \"clicktatorship_definition\": \"A form of government that combines a social‑media worldview with authoritarian tendencies, making officials’ beliefs, judgment, and decision‑making directly responsive to online content.\",\n",
+      "    \"online_content_as_policy\": \"Videos of immigration raids, conspiracy‑laden posts, and other online content are used to justify policy actions such as deploying the National Guard or cutting resources to dissenting states.\",\n",
+      "    \"role_of_X_and_Musk\": \"X (formerly Twitter) under Elon Musk promotes conspiratorial content; the platform’s changes reward professional posters, creating a pipeline that feeds the administration’s agenda.\",\n",
+      "    \"government_officials_using_social_media\": \"Senior officials like Pam Bondi have used printed X posts in Senate hearings, reflecting the shift toward online discourse in official duties.\",\n",
+      "    \"conspiracy_influence_on_decisions\": \"The elimination of USAID is cited as the first federal agency killed by online conspiracy theories, allegedly influenced by Musk’s beliefs.\",\n",
+      "    \"mutual_dependency\": \"The article describes a practical interdependence where X serves as an extension of the state and the state supports Musk’s interests.\"\n",
+      "  },\n",
+      "  \"relevance\": 9.0,\n",
+      "  \"impact_score\": 8.0,\n",
+      "  \"student_relevance\": 7.5,\n",
+      "  \"long_term_importance\": 7.0,\n",
+      "  \"deduplication_hint\": \"Trump_SecondTerm_Clicktatorship\"\n",
+      "}\n"
+     ]
+    }
+   ],
+   "source": [
+    "\n",
+    "chat_completion = groq.chat.completions.create(\n",
+    "    messages=[
+",
+    "        {
+",
+    "            \"role\": \"system\",
+",
+    "            \"content\": system_prompt
+",
+    "        },
+",
+    "        {
+",
+    "            \"role\": \"user\",
+",
+    "            \"content\": user_prompt.replace(\"{{ARTICLE_CONTENT}}\", articles_info[1]['content'])
+",
+    "        }
+",
+    "    ],
+",
+    "    model=\"groq/compound-mini\",
+",
+    ")\n",
+    "\n",
+    "print(chat_completion.choices[0].message.content)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d7d0ae3a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import json\n",
+    "import time\n",
+    "\n",
+    "# This will store the structured data extracted from the articles.\n",
+    "structured_facts = []\n",
+    "\n",
+    "# Loop through each article in 'articles_info'. \n",
+    "# 'enumerate' is used to get both the index (i) and the article content.\n",
+    "for i, article in enumerate(articles_info):\n",
+    "    # Print progress to the console.\n",
+    "    print(f\"Processing article {i+1}/{len(articles_info)}: {article['title']}\")\n",
+    "    \n",
+    "    # To prevent excessively long processing times and high API costs during this run,\n",
+    "    # we'll only process the first 5 articles. \n",
+    "    # This 'if' block can be removed to process all articles.\n",
+    "    if i >= 5:\n",
+    "        print(\"Stopping after 5 articles for this demonstration.\")\n",
+    "        break\n",
+    "        \n",
+    "    try:\n",
+    "        # Send the article content to the Groq API for extraction.\n",
+    "        # The 'system_prompt' and 'user_prompt' variables are predefined in a previous cell.\n",
+    "        chat_completion = groq.chat.completions.create(\n",
+    "            messages=[
+",
+    "                {
+",
+    "                    \"role\": \"system\",
+",
+    "                    \"content\": system_prompt
+",
+    "                },
+",
+    "                {
+",
+    "                    \"role\": \"user\",
+",
+    "                    \"content\": user_prompt.replace(\"{{ARTICLE_CONTENT}}\", article['content'])
+",
+    "                }
+",
+    "            ],
+",
+    "            model=\"groq/compound-mini\",
+",
+    "            temperature=0.1 # A low temperature is used for more deterministic, consistent output.\n",
+    "        )
+",
+    "        \n",
+    "        # Extract the response content from the API result.\n",
+    "        response_content = chat_completion.choices[0].message.content
+",
+    "        \n",
+    "        try:\n",
+    "            # The API is expected to return a JSON string. We parse it into a Python dictionary.\n",
+    "            fact = json.loads(response_content)
+",
+    "            \n",
+    "            # For context, we'll add some of the original article's metadata to our structured fact.\n",
+    "            fact['original_article'] = {\n",
+    "                'title': article.get('title'),\n",
+    "                'link': article.get('link'),\n",
+    "                'published': article.get('published')\n",
+    "            }\n",
+    "            structured_facts.append(fact)\n",
+    "            \n",
+    "        except json.JSONDecodeError:\n",
+    "            # If the response is not valid JSON, we print an error and the problematic response.\n",
+    "            print(f\"   - Failed to decode JSON from response for article: {article['title']}\")\n",
+    "            print(f\"   - Response was: {response_content}\")\n",
+    "\n",
+    "    except Exception as e:\n",
+    "        # Handle any other exceptions that might occur during the API call.\n",
+    "        print(f\"   - An error occurred processing article: {article['title']}\")\n",
+    "        print(f\"   - Error: {e}\")\n",
+    "    \n",
+    "    # A brief pause to prevent overwhelming the API with too many requests too quickly.\n",
+    "    time.sleep(1)\n",
+    "\n",
+    "# Save the list of structured facts to a new JSON file.\n",
+    "# This makes it easy to inspect the data and use it in later steps without re-processing.\n",
+    "with open(\"structured_facts.json\", \"w\", encoding='utf-8') as f:\n",
+    "    json.dump(structured_facts, f, indent=4, ensure_ascii=False)\n",
+    "\n",
+    "print(f\"\\nSuccessfully processed and saved {len(structured_facts)} structured facts to structured_facts.json\")\n",
+    "\n",
+    "# To verify, let's print the first structured fact that was extracted.\n",
+    "if structured_facts:\n",
+    "    print(\"\\n--- First structured fact ---\")\n",
+    "    print(json.dumps(structured_facts[0], indent=2))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e6f491f3-7033-4e4a-9c97-91924610d922",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# This is a placeholder for the next step: generating the newsletter.\n",
+    "# We will read the 'structured_facts.json' file and then use another LLM call to generate the newsletter.\n",
+    "\n",
+    "newsletter_system_prompt = \"\"\"\n",
+    "You are a master newsletter curator and writer for 'AI & Tech Weekly'.\n",
+    "Your tone is insightful, engaging, and slightly informal but always professional.\n",
+    "You explain complex topics simply without dumbing them down.\n",
+    "Your audience consists of tech professionals, students, and enthusiasts.\n",
+    "\"\"\"\n",
+    "newsletter_user_prompt = \"\"\"\n",
+    "Create an edition of the 'AI & Tech Weekly' newsletter using the following structured articles.\n",
+    "\n",
+    "Instructions:\n",
+    "1.  **Select the Top 3-5 Most Important Articles**: Use the 'impact_score', 'relevance', and 'long_term_importance' to guide your selection. Choose the articles that are most significant to a tech-savvy audience.\n",
+    "2.  **Write an Engaging Introduction**: Start with a catchy title for this week's newsletter and a brief, engaging opening paragraph that sets the theme for the week, hinting at the top stories.\n",
+    "3.  **Summarize Each Selected Article**: For each chosen article, create a section with:\n",
+    "    - A compelling title (you can rephrase the original 'headline').\n",
+    "    - A 2-3 sentence summary that expands on the 'summary_1_sentence' and incorporates the 'key_points'. Explain WHY this news is important.\n",
+    "    - A link to the original article.\n",
+    "4.  **Structure and Formatting**: \n",
+    "    - Use Markdown for clear, readable formatting.\n",
+    "    - Use headers (##) for article titles.\n",
+    "    - Use bolding for emphasis on key terms or impacts.\n",
+    "    - Use bullet points for lists if it improves readability.\n",
+    "5.  **Concluding Thought**: End with a short, thought-provoking paragraph that ties the articles together or looks to the week ahead in tech.\n",
+    "\n",
+    "Here are the articles to work from:\n",
+    "```json\n",
+    "{{ARTICLES_JSON}}",
+    "```\n",
+    """\n",
+    "\n",
+    "# Load the facts we just created\n",
+    "with open('structured_facts.json', 'r', encoding='utf-8') as f:\n",
+    "    loaded_facts = json.load(f)\n",
+    "\n",
+    "if loaded_facts:\n",
+    "    # Convert the list of facts into a JSON string to be embedded in the prompt\n",
+    "    articles_json_string = json.dumps(loaded_facts, indent=2)\n",
+    "    \n",
+    "    # Create the final prompt for the newsletter generation\n",
+    "    final_newsletter_prompt = newsletter_user_prompt.replace(\"{{ARTICLES_JSON}}\", articles_json_string)\n",
+    "    \n",
+    "    print(\"--- Generating Newsletter ---")\n",
+    "    \n",
+    "    # Call the LLM to generate the newsletter\n",
+    "    newsletter_completion = groq.chat.completions.create(\n",
+    "        messages=[
+",
+    "            {
+",
+    "                \"role\": \"system\",
+",
+    "                \"content\": newsletter_system_prompt
+",
+    "            },
+",
+    "            {
+",
+    "                \"role\": \"user\",
+",
+    "                \"content\": final_newsletter_prompt
+",
+    "            }
+",
+    "        ],
+",
+    "        model=\"llama3-70b-8192\", # Using a larger model for creative writing
+",
+    "        temperature=0.7 # Higher temperature for more creative and less repetitive text
+",
+    "    )\n",
+    "    \n",
+    "    newsletter_content = newsletter_completion.choices[0].message.content
+",
+    "    \n",
+    "    # Save the newsletter to a markdown file\n",
+    "    with open(\"newsletter.md\", \"w\", encoding='utf-8') as f:\n",
+    "        f.write(newsletter_content)
+",
+    "        \n",
+    "    print(\"\\nNewsletter has been generated and saved to newsletter.md\")\n",
+    "    \n",
+    "    # Display the generated newsletter\n",
+    "    print(\"\\n--- Generated Newsletter ---\")\n",
+    "    print(newsletter_content)\n",
+    "else:\n",
+    "    print(\"No structured facts were available to generate the newsletter.\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "DSEC-AI-newsletter",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
