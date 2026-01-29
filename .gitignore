@@ -8,3 +8,13 @@ env/
 *.pyc
 *.pyo
 .python-version
+gemini.md
+fix_notebook.py
+opencode/agents/
+
+# Newsletter and credentials
+subscribers.json
+newsletter.json
+.env
+*.env
+*.secret
