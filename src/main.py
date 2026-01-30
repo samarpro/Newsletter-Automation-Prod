@@ -128,10 +128,10 @@ def main():
     print(os.environ.get("GROQ_API_KEY"))
     groq = Client(api_key=os.environ.get("GROQ_API_KEY"))
     try:
-        with open("publishers.yaml", "r") as f:
+        with open("config/publishers.yaml", "r") as f:
             publishers = yaml.safe_load(f)["publishers"]
     except Exception as e:
-        print(f"Error loading publishers.yaml: {e}")
+        print(f"Error loading config/publishers.yaml: {e}")
         publishers = []
 
     if not publishers:
@@ -149,7 +149,7 @@ def main():
         return
 
     # load scraped_content.json
-    with open("scraped_content.json", "r", encoding="utf-8") as f:
+    with open("output/scraped_content.json", "r", encoding="utf-8") as f:
         scraped_articles = json.load(f)
 
     print(f"Scraped {len(scraped_articles)} articles successfully")

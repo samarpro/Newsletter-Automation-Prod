@@ -17,8 +17,8 @@ class NewsletterBuilder:
 
     def __init__(
         self,
-        structured_facts_file: str = "structured_facts.json",
-        scraped_content_file: str = "scraped_content.json",
+        structured_facts_file: str = "output/structured_facts.json",
+        scraped_content_file: str = "output/scraped_content.json",
     ):
         self.structured_facts_file = structured_facts_file
         self.scraped_content_file = scraped_content_file
@@ -85,7 +85,7 @@ class NewsletterBuilder:
         return newsletter
 
     def save_newsletter(
-        self, newsletter: dict, filename: str = "newsletter.json"
+        self, newsletter: dict, filename: str = "output/newsletter.json"
     ) -> bool:
         """Save newsletter to JSON file"""
         try:

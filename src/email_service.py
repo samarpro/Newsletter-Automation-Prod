@@ -33,7 +33,7 @@ class EmailConfig:
 class SubscriberManager:
     """Manages newsletter subscribers"""
 
-    def __init__(self, subscribers_file: str = "subscribers.json"):
+    def __init__(self, subscribers_file: str = "output/subscribers.json"):
         self.subscribers_file = subscribers_file
         self._ensure_file_exists()
 

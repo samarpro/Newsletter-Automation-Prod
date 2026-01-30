@@ -40,7 +40,7 @@ def cmd_send():
 
     newsletter = builder.build_newsletter(articles=articles)
     builder.save_newsletter(newsletter)
-    print(f"✅ Newsletter saved to newsletter.json")
+    print(f"✅ Newsletter saved to output/newsletter.json")
 
     result = sender.send_newsletter(articles)
     print(f"\n📧 Newsletter Sending Results:")
@@ -153,8 +153,8 @@ def cmd_stats():
     print(f"   Available Articles: {len(articles)}")
     print(f"   Structured Facts: {len(structured_facts)}")
 
-    if os.path.exists("newsletter.json"):
-        with open("newsletter.json", "r") as f:
+    if os.path.exists("output/newsletter.json"):
+        with open("output/newsletter.json", "r") as f:
             last_newsletter = json.load(f)
         print(f"\n📋 Last Newsletter:")
         print(f"   Generated: {last_newsletter.get('generated_at', 'N/A')}")
