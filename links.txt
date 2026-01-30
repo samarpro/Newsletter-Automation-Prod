@@ -1,5 +1,0 @@
-<link href="https://www.theguardian.com/au/rss" rel="alternate" type="application/rss+xml"/>
-<link data-rh="true" href="https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" rel="alternate" title="RSS" type="application/rss+xml"/>
-<link href="https://www.wired.com/feed/rss" rel="alternate" type="application/rss+xml"/>
-<link href="https://techcrunch.com/feed/" rel="alternate" title="TechCrunch » Feed" type="application/rss+xml"/>
-<link data-hid="rss-feed-news" data-n-head="ssr" href="https://www.cnet.com/rss/news/" rel="alternate" type="application/rss+xml"/>

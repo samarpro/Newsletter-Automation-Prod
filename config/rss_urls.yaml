@@ -1,0 +1,7 @@
+rss_urls:
+  - 'https://www.theguardian.com/uk/technology/rss'
+  - 'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/international/section/technology/rss.xml'
+  - 'https://www.wired.com/feed/category/business/latest/rss' 
+  - "https://techcrunch.com/category/startups/feed"
+  - "https://techcrunch.com/category/artificial-intelligence/feed/"
+  - "https://techcrunch.com/category/security/feed/"
