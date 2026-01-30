@@ -22,3 +22,5 @@ output/newsletter.json
 .env
 *.env
 *.secret
+CLAUDE.md
+notes.md
