@@ -22,5 +22,7 @@ output/newsletter.json
 .env
 *.env
 *.secret
-CLAUDE.md
-notes.md
+# Plan files (should be in ~/.claude/plans/)
+*-panda.md
+*-plan.md
+synthetic-*.md
